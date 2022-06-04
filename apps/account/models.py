@@ -3,8 +3,6 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from core.enums.enums import Gender
-
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password, **extra_fields):
@@ -45,8 +43,9 @@ class Account(AbstractUser):
 
 class UserProfile(models.Model):
     account = models.OneToOneField(Account, on_delete=models.CASCADE, null=True, related_name='user_profile')
-    gender = models.IntegerField(choices=Gender.choices, default=Gender.FEMALE)
+    about = models.CharField(max_length=256, blank=True, null=True)
     image = models.ImageField(upload_to='users/', blank=True)
+    date_of_birth = models.DateField(blank=True, null=True)
 
     def __str__(self):
         return self.account.email
