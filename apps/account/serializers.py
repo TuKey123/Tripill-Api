@@ -4,11 +4,20 @@ from django.conf import settings
 from datetime import datetime, timedelta
 from django.db import transaction
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
 from .models import EmailVerification, Account, UserProfile
 from ..trip.models import Trip, Album
 
 import random
+
+
+# EXTRA FUNC
+def less_than_2mb(image):
+    # convert to Mb
+    size = image.size / (1024 ** 2)
+
+    if size > 2:
+        return False
+    return True
 
 
 def create_verification_record(email):
@@ -86,7 +95,8 @@ class LoginSerializer(TokenObtainPairSerializer):
             'email': self.user.email,
             'date_joined': self.user.date_joined,
             'about': self.user.user_profile.about,
-            'date_of_birth': self.user.user_profile.date_of_birth
+            'date_of_birth': self.user.user_profile.date_of_birth,
+            'image': self.user.user_profile.image
         }
 
         return data
@@ -158,6 +168,7 @@ class ResetPasswordSerializer(serializers.ModelSerializer):
 class AccountSerializer(serializers.ModelSerializer):
     about = serializers.CharField(source="user_profile.about")
     date_of_birth = serializers.CharField(source="user_profile.date_of_birth")
+    image = serializers.CharField(source="user_profile.image")
     trips = serializers.SerializerMethodField(read_only=True)
 
     def get_trips(self, instance):
@@ -166,4 +177,62 @@ class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         fields = ['id', 'first_name', 'last_name', 'email',
-                  'date_joined', 'about', 'date_of_birth', 'trips']
+                  'date_joined', 'about', 'date_of_birth', 'trips', 'image']
+
+
+class AccountUploadImageSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['image'] = instance.image.url
+
+        return representation
+
+    def validate(self, attrs):
+        data = self.context['request'].data
+        key = list(data.keys())[0]
+
+        image = data[key]
+        if not image:
+            raise serializers.ValidationError('image can not be none')
+        elif not less_than_2mb(image):
+            raise serializers.ValidationError('image must be less than 2mb')
+
+        attrs['image'] = image
+        return attrs
+
+    def create(self, validated_data):
+        instance = self.context['request'].user.user_profile
+        instance.image = validated_data['image']
+        instance.save()
+
+        return instance
+
+    class Meta:
+        model = UserProfile
+        fields = []
+
+
+class UpdateUserProfile(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='account.first_name')
+    last_name = serializers.CharField(source='account.last_name')
+    image = serializers.CharField(max_length=256, required=True)
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            account = instance.account
+            account.first_name = validated_data['account']['first_name']
+            account.last_name = validated_data['account']['last_name']
+
+            account.save()
+
+            instance.about = validated_data['about']
+            instance.date_of_birth = validated_data['date_of_birth']
+            instance.image = validated_data['image']
+
+            instance.save()
+
+        return instance
+
+    class Meta:
+        model = UserProfile
+        fields = ['last_name', 'first_name', 'about', 'date_of_birth', 'image']

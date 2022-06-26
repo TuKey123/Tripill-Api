@@ -15,3 +15,10 @@ album_router.register('', views.AlbumView)
 album_url_patterns = [
     path('', include(album_router.urls)),
 ]
+
+item_router = DefaultRouter()
+item_router.register('', views.ItemViewSet)
+
+item_url_patterns = [
+    path('', include(item_router.urls)),
+]

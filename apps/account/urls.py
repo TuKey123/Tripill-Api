@@ -17,8 +17,16 @@ auth_url_patterns = [
 ]
 
 account_router = DefaultRouter()
+account_router.register('upload-image', views.AccountUploadImage)
 account_router.register('', views.AccountView)
 
 account_url_patterns = [
     path('', include(account_router.urls)),
+]
+
+upload_image_router = DefaultRouter()
+upload_image_router.register('', views.UploadImage)
+
+upload_image_patterns = [
+    path('', include(upload_image_router.urls)),
 ]

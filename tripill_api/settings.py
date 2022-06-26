@@ -29,7 +29,8 @@ SECRET_KEY = 'django-insecure-j6wbb7*&plsd8*&lt-(=okkm07&&--bf2dw6vf#*jbky2+%k5p
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+CORS_ALLOW_ALL_ORIGINS = True
 
 # Application definition
 
@@ -45,14 +46,18 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_yasg',
+    'corsheaders',
+    'cloudinary_storage',
 
     # apps
-    'apps.account'
+    'apps.account',
+    'apps.trip'
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -116,6 +121,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 REST_FRAMEWORK = {
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
     ],
@@ -160,7 +168,7 @@ VERIFY_CODE_LENGTH = 5
 VERIFY_CODE_EXPIRED_HOURS = 24
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -192,3 +200,11 @@ SWAGGER_SETTINGS = {
         }
     }
 }
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'tripill',
+    'API_KEY': '971114791582729',
+    'API_SECRET': 'YnOq6CzsQ_UqpBT94J9HI4HATkA'
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
