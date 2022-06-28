@@ -1,8 +1,8 @@
 from django.db import transaction
+from django.db.models import F
 from rest_framework import serializers
-
-from apps.account.models import Account, UserProfile
-from apps.trip.models import Trip, Album, Item, AppreciatedItem
+from apps.account.models import Account
+from apps.trip.models import Trip, Album, Item
 
 
 class TripSerializer(serializers.ModelSerializer):
@@ -22,6 +22,7 @@ class NestedAccountSerializer(serializers.ModelSerializer):
 class TripItemSerializer(serializers.ModelSerializer):
     is_liked = serializers.SerializerMethodField(read_only=True)
     number_of_likes = serializers.SerializerMethodField(read_only=True)
+    owner_id = serializers.SerializerMethodField(read_only=True)
 
     def get_is_liked(self, instance):
         user = self.context['request'].user
@@ -33,16 +34,26 @@ class TripItemSerializer(serializers.ModelSerializer):
     def get_number_of_likes(self, instance):
         return instance.appreciated_users.all().count()
 
+    def get_owner_id(self, instance):
+        return instance.trip.owner.id
+
     class Meta:
         model = Item
         fields = ['id', 'lat', 'lng', 'location', 'image', 'description',
-                  'start_date', 'end_date', 'trip', 'note', 'is_shared', 'is_liked', 'number_of_likes']
+                  'start_date', 'end_date', 'trip', 'note', 'is_shared', 'is_liked', 'number_of_likes', 'owner_id',
+                  'ordinal']
 
 
 class TripDetailSerializer(serializers.ModelSerializer):
     owner = NestedAccountSerializer()
     collaborators = NestedAccountSerializer(many=True)
     items = TripItemSerializer(many=True)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['items'].sort(key=lambda x: x['ordinal'])
+
+        return representation
 
     class Meta:
         model = Trip
@@ -127,12 +138,47 @@ class UpdateTripSerializer(serializers.ModelSerializer):
 
 
 class ItemSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        existed_item = Item.objects.filter(trip=attrs["trip"], lat=attrs['lat'], lng=attrs['lng']).first()
+        if existed_item:
+            raise serializers.ValidationError('this item has already existed')
+
+        return super().validate(attrs)
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['ordinal'] = instance.ordinal
+
+        return representation
+
+    def create(self, validated_data):
+        trip = validated_data['trip']
+        validated_data['ordinal'] = trip.items.all().count()
+
+        return super().create(validated_data)
+
     class Meta:
         model = Item
-        fields = ['id', 'trip', 'lat', 'lng', 'description', 'location', 'image', 'start_date', 'end_date', 'note']
+        fields = ['id', 'trip', 'lat', 'lng', 'description', 'location',
+                  'image', 'start_date', 'end_date', 'note']
 
 
 class ShareItemSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        user = self.context['request'].user
+        item = self.instance
+
+        if attrs['is_shared']:
+            shared_item = Item.objects.filter(lat=item.lat,
+                                              lng=item.lng,
+                                              is_shared=True,
+                                              trip__owner_id=user.id).first()
+
+            if shared_item:
+                raise serializers.ValidationError('has another item like this has been shared')
+
+        return super().validate(attrs)
+
     class Meta:
         model = Item
         fields = ['id', 'is_shared']
@@ -141,6 +187,7 @@ class ShareItemSerializer(serializers.ModelSerializer):
 class UsersSharedSerializer(serializers.ModelSerializer):
     image = serializers.CharField(source='user_profile.image')
     number_of_likes = serializers.SerializerMethodField(read_only=True)
+    item_id = serializers.SerializerMethodField(read_only=True)
 
     def get_number_of_likes(self, instance):
         item = self.context.get("item")
@@ -149,6 +196,44 @@ class UsersSharedSerializer(serializers.ModelSerializer):
 
             return account_item.appreciated_users.all().count()
 
+    def get_item_id(self, instance):
+        item = self.context.get("item")
+        with transaction.atomic():
+            account_item = Item.objects.filter(lat=item.lat, lng=item.lng, trip__owner_id=instance.id).first()
+
+            return account_item.id
+
     class Meta:
         model = Account
-        fields = ['id', 'image', 'first_name', 'last_name', 'email', 'number_of_likes']
+        fields = ['id', 'image', 'first_name', 'last_name', 'email', 'number_of_likes', 'item_id']
+
+
+class ItemOwnerSerializer(serializers.ModelSerializer):
+    image = serializers.CharField(source='user_profile.image')
+
+    class Meta:
+        model = Account
+        fields = ['id', 'image', 'first_name', 'last_name', 'email']
+
+
+class ItemOrdinalSerializer(serializers.ModelSerializer):
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            if validated_data['ordinal'] < instance.ordinal:
+                Item.objects.filter(trip=instance.trip,
+                                    ordinal__gte=validated_data['ordinal'],
+                                    ordinal__lt=instance.ordinal).update(ordinal=F('ordinal') + 1)
+
+            else:
+                Item.objects.filter(trip=instance.trip,
+                                    ordinal__gt=instance.ordinal,
+                                    ordinal__lte=validated_data['ordinal']).update(ordinal=F('ordinal') - 1)
+
+            instance.ordinal = validated_data['ordinal']
+            instance.save()
+
+            return instance
+
+    class Meta:
+        model = Item
+        fields = ['id', 'ordinal']

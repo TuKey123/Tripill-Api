@@ -92,5 +92,4 @@ class UploadImage(viewsets.GenericViewSet, mixins.CreateModelMixin):
             return Response(data='image must be less than 2mb', status=status.HTTP_404_NOT_FOUND)
 
         cloud = cloudinary.uploader.upload(image, folder="trips/", overwrite=True)
-
         return Response(data={"image": cloud['url']}, status=status.HTTP_200_OK)

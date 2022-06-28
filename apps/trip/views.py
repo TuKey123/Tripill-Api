@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -8,8 +9,9 @@ from apps.trip.models import Trip, Album, Item, AppreciatedItem
 from apps.trip.serializers import (TripSerializer, TripDetailSerializer, AlbumSerializer, AlbumDetailSerializer,
                                    UpdateAlbumItemsSerializer, CreateAlbumSerializer, UpdateAlbumSerializer,
                                    CreateTripSerializer, UpdateTripSerializer, ItemSerializer, ShareItemSerializer,
-                                   UsersSharedSerializer)
-from django.db.models import Q
+                                   UsersSharedSerializer, TripItemSerializer, ItemOwnerSerializer,
+                                   ItemOrdinalSerializer)
+from django.db.models import Q, F
 
 
 class AlbumView(viewsets.GenericViewSet,
@@ -122,17 +124,22 @@ class TripView(viewsets.GenericViewSet,
         if instance.owner.id != user.id:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        item = instance.items.all().filter(id=item_id).first()
+        with transaction.atomic():
+            item = instance.items.all().filter(id=item_id).first()
 
-        if not item:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            if not item:
+                return Response(status=status.HTTP_404_NOT_FOUND)
 
-        item.delete()
+            Item.objects.filter(trip=instance,
+                                ordinal__gt=item.ordinal).update(ordinal=F('ordinal') - 1)
+
+            item.delete()
 
         return Response(status=status.HTTP_200_OK)
 
 
 class ItemViewSet(viewsets.GenericViewSet,
+                  mixins.RetrieveModelMixin,
                   mixins.CreateModelMixin,
                   mixins.UpdateModelMixin):
     queryset = Item.objects.all()
@@ -144,9 +151,20 @@ class ItemViewSet(viewsets.GenericViewSet,
             return ShareItemSerializer
         elif self.action == 'users_shared':
             return UsersSharedSerializer
+        elif self.action == 'retrieve':
+            return TripItemSerializer
+        elif self.action == 'user':
+            return ItemOwnerSerializer
+        elif self.action == 'update_ordinal':
+            return ItemOrdinalSerializer
         elif self.action == 'like':
             return None
         return ItemSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        if not self.get_object().is_shared:
+            return Response(data="this item has not been shared", status=status.HTTP_400_BAD_REQUEST)
+        return super().retrieve(request, args, kwargs)
 
     @action(detail=True, url_path='like', methods=['Put'])
     def like(self, request, pk=None):
@@ -182,5 +200,24 @@ class ItemViewSet(viewsets.GenericViewSet,
                                           trips__items__is_shared=True)
 
         serializer = self.get_serializer(queryset, many=True, context={'item': instance})
+
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, url_path='user', methods=['get'])
+    def user(self, request, pk=None):
+        instance = self.get_object()
+        owner = instance.trip.owner
+
+        serializer = self.get_serializer(owner)
+
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, url_path='update_ordinal', methods=['put'])
+    def update_ordinal(self, request, pk=None):
+        instance = self.get_object()
+
+        serializer = self.get_serializer(instance, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
         return Response(data=serializer.data, status=status.HTTP_200_OK)

@@ -40,6 +40,7 @@ class Item(models.Model):
     end_date = models.DateTimeField(default=datetime.now())
     note = models.JSONField(null=True)
     is_shared = models.BooleanField(default=False)
+    ordinal = models.IntegerField(default=0)
 
 
 class AppreciatedTrip(models.Model):
