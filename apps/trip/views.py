@@ -1,16 +1,16 @@
 from django.db import transaction
-from rest_framework import viewsets, mixins, status
+from rest_framework import viewsets, mixins, status, filters
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.account.models import Account
-from apps.trip.models import Trip, Album, Item, AppreciatedItem
+from apps.trip.models import Trip, Album, Item, AppreciatedItem, AppreciatedTrip
 from apps.trip.serializers import (TripSerializer, TripDetailSerializer, AlbumSerializer, AlbumDetailSerializer,
                                    UpdateAlbumItemsSerializer, CreateAlbumSerializer, UpdateAlbumSerializer,
                                    CreateTripSerializer, UpdateTripSerializer, ItemSerializer, ShareItemSerializer,
                                    UsersSharedSerializer, TripItemSerializer, ItemOwnerSerializer,
-                                   ItemOrdinalSerializer)
+                                   ItemOrdinalSerializer, UpdateItemSerializer, ItemsSharedSerializer)
 from django.db.models import Q, F
 
 
@@ -80,6 +80,7 @@ class TripView(viewsets.GenericViewSet,
     queryset = Trip.objects.all()
     serializer_class = TripSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -90,6 +91,10 @@ class TripView(viewsets.GenericViewSet,
             return CreateTripSerializer
         elif self.action == 'update':
             return UpdateTripSerializer
+        elif self.action == 'item_details':
+            return TripItemSerializer
+        elif self.action == 'like':
+            return None
         return TripSerializer
 
     def list(self, request, *args, **kwargs):
@@ -97,6 +102,17 @@ class TripView(viewsets.GenericViewSet,
         serializer = self.get_serializer(queryset, many=True)
 
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, url_path="all", methods=['Get'])
+    def all(self, request):
+        search_term = request.GET.get('search', '')
+        queryset = self.get_queryset().filter(name__icontains=search_term)
+        serializer = self.get_serializer(queryset, many=True)
+
+        data = list(serializer.data)
+        data.sort(key=lambda x: x['number_of_likes'], reverse=True)
+
+        return Response(data=data, status=status.HTTP_200_OK)
 
     @action(detail=False, url_path="users/(?P<user_id>[0-9]+)", methods=['Get'])
     def user_trips(self, request, user_id=None):
@@ -115,7 +131,7 @@ class TripView(viewsets.GenericViewSet,
 
         return Response(data=serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, url_path="items/(?P<item_id>[0-9]+)", methods=['Delete'])
+    @action(detail=True, url_path="items/(?P<item_id>[0-9]+)", methods=['delete'])
     def remove_item(self, request, pk=None, item_id=None):
         user = request.user
 
@@ -137,6 +153,28 @@ class TripView(viewsets.GenericViewSet,
 
         return Response(status=status.HTTP_200_OK)
 
+    @action(detail=True, url_path="item_details/(?P<item_id>[0-9]+)", methods=['get'])
+    def item_details(self, request, pk=None, item_id=None):
+        instance = self.get_object()
+
+        item = instance.items.filter(id=item_id).first()
+        serializer = self.get_serializer(item)
+
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, url_path='like', methods=['Put'])
+    def like(self, request, pk=None):
+        instance = self.get_object()
+        user = request.user
+
+        appreciated_trip = user.appreciated_trips.all().filter(trip=instance).first()
+        if appreciated_trip:
+            appreciated_trip.delete()
+        else:
+            AppreciatedTrip.objects.create(user=user, trip=instance)
+
+        return Response(status=status.HTTP_200_OK)
+
 
 class ItemViewSet(viewsets.GenericViewSet,
                   mixins.RetrieveModelMixin,
@@ -145,6 +183,7 @@ class ItemViewSet(viewsets.GenericViewSet,
     queryset = Item.objects.all()
     permission_classes = [IsAuthenticated]
     serializer_class = ItemSerializer
+    filter_backends = [filters.SearchFilter]
 
     def get_serializer_class(self):
         if self.action == 'share_item':
@@ -157,6 +196,12 @@ class ItemViewSet(viewsets.GenericViewSet,
             return ItemOwnerSerializer
         elif self.action == 'update_ordinal':
             return ItemOrdinalSerializer
+        elif self.action == 'update':
+            return UpdateItemSerializer
+        elif self.action == 'shared':
+            return ItemsSharedSerializer
+        elif self.action == "shared_all":
+            return ItemsSharedSerializer
         elif self.action == 'like':
             return None
         return ItemSerializer
@@ -221,3 +266,21 @@ class ItemViewSet(viewsets.GenericViewSet,
         serializer.save()
 
         return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, url_path="shared/users/(?P<user_id>[0-9]+)", methods=['Get'])
+    def shared(self, request, user_id=None):
+        queryset = Item.objects.filter(trip__owner_id=user_id, is_shared=True)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, url_path="shared/all", methods=['Get'])
+    def shared_all(self, request):
+        search_term = request.GET.get('search', '')
+        queryset = Item.objects.filter(is_shared=True, location__icontains=search_term)
+        serializer = self.get_serializer(queryset, many=True)
+
+        data = list(serializer.data)
+        data.sort(key=lambda x: x['number_of_likes'], reverse=True)
+
+        return Response(data=data, status=status.HTTP_200_OK)

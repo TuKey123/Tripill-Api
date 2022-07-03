@@ -6,9 +6,27 @@ from apps.trip.models import Trip, Album, Item
 
 
 class TripSerializer(serializers.ModelSerializer):
+    days = serializers.SerializerMethodField(read_only=True)
+    is_liked = serializers.SerializerMethodField(read_only=True)
+    number_of_likes = serializers.SerializerMethodField(read_only=True)
+
+    def get_is_liked(self, instance):
+        user = self.context['request'].user
+
+        appreciated_trip = user.appreciated_trips.all().filter(trip=instance).first()
+
+        return True if appreciated_trip else False
+
+    def get_number_of_likes(self, instance):
+        return instance.appreciated_users.all().count()
+
+    def get_days(self, instance):
+        days = instance.end_date - instance.start_date
+        return days.days
+
     class Meta:
         model = Trip
-        fields = ['id', 'name', 'location', 'image', 'collaborators', 'album']
+        fields = ['id', 'name', 'location', 'image', 'collaborators', 'album', 'days', 'is_liked', 'number_of_likes']
 
 
 class NestedAccountSerializer(serializers.ModelSerializer):
@@ -44,10 +62,16 @@ class TripItemSerializer(serializers.ModelSerializer):
                   'ordinal']
 
 
+class TripItemNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Item
+        fields = ['id', 'image', 'location', 'lat', 'lng', 'ordinal']
+
+
 class TripDetailSerializer(serializers.ModelSerializer):
     owner = NestedAccountSerializer()
     collaborators = NestedAccountSerializer(many=True)
-    items = TripItemSerializer(many=True)
+    items = TripItemNestedSerializer(many=True)
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -159,8 +183,7 @@ class ItemSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Item
-        fields = ['id', 'trip', 'lat', 'lng', 'description', 'location',
-                  'image', 'start_date', 'end_date', 'note']
+        fields = ['id', 'trip', 'lat', 'lng', 'location']
 
 
 class ShareItemSerializer(serializers.ModelSerializer):
@@ -192,14 +215,16 @@ class UsersSharedSerializer(serializers.ModelSerializer):
     def get_number_of_likes(self, instance):
         item = self.context.get("item")
         with transaction.atomic():
-            account_item = Item.objects.filter(lat=item.lat, lng=item.lng, trip__owner_id=instance.id).first()
+            account_item = Item.objects.filter(lat=item.lat, lng=item.lng, is_shared=True,
+                                               trip__owner_id=instance.id).first()
 
             return account_item.appreciated_users.all().count()
 
     def get_item_id(self, instance):
         item = self.context.get("item")
         with transaction.atomic():
-            account_item = Item.objects.filter(lat=item.lat, lng=item.lng, trip__owner_id=instance.id).first()
+            account_item = Item.objects.filter(lat=item.lat, lng=item.lng, is_shared=True,
+                                               trip__owner_id=instance.id).first()
 
             return account_item.id
 
@@ -237,3 +262,29 @@ class ItemOrdinalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = ['id', 'ordinal']
+
+
+class UpdateItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Item
+        fields = ['id', 'lat', 'lng', 'location', 'image', 'description',
+                  'start_date', 'end_date', 'trip', 'note', ]
+
+
+class ItemsSharedSerializer(serializers.ModelSerializer):
+    is_liked = serializers.SerializerMethodField(read_only=True)
+    number_of_likes = serializers.SerializerMethodField(read_only=True)
+
+    def get_is_liked(self, instance):
+        user = self.context['request'].user
+
+        appreciated_item = user.appreciated_items.all().filter(item=instance).first()
+
+        return True if appreciated_item else False
+
+    def get_number_of_likes(self, instance):
+        return instance.appreciated_users.all().count()
+
+    class Meta:
+        model = Item
+        fields = ['id', 'lat', 'lng', 'location', 'image', 'is_liked', 'number_of_likes']

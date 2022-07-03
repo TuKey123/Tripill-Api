@@ -4,3 +4,6 @@ djangorestframework==3.13.1
 pytz==2022.1
 sqlparse==0.4.2
 tzdata==2022.1
+
+cloudinary~=1.29.0
+python-dotenv~=0.20.0

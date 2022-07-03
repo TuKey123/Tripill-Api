@@ -1,5 +1,6 @@
 import cloudinary
-from rest_framework import viewsets, mixins, status
+from django.db.models import Q
+from rest_framework import viewsets, mixins, status, filters
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -45,11 +46,24 @@ class AccountView(viewsets.GenericViewSet, mixins.ListModelMixin, mixins.Retriev
     queryset = Account.objects.all()
     serializer_class = AccountSerializer
     permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter]
 
     def get_serializer_class(self):
         if self.action == 'update_profile':
             return UpdateUserProfile
         return AccountSerializer
+
+    def list(self, request, *args, **kwargs):
+        search_term = request.GET.get('search', '')
+        queryset = self.get_queryset().filter(is_superuser=False).filter(
+            Q(first_name__icontains=search_term) | Q(last_name__icontains=search_term) | Q(
+                email__icontains=search_term))
+        serializer = self.get_serializer(queryset, many=True)
+
+        data = list(serializer.data)
+        data.sort(key=lambda x: x['number_of_likes'], reverse=True)
+
+        return Response(data=data, status=status.HTTP_200_OK)
 
     @action(detail=False, url_path="me", methods=['Get'])
     def me(self, request):

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.db import transaction
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import EmailVerification, Account, UserProfile
-from ..trip.models import Trip, Album
+from ..trip.models import Trip, Album, AppreciatedTrip, AppreciatedItem
 
 import random
 
@@ -170,14 +170,21 @@ class AccountSerializer(serializers.ModelSerializer):
     date_of_birth = serializers.CharField(source="user_profile.date_of_birth")
     image = serializers.CharField(source="user_profile.image")
     trips = serializers.SerializerMethodField(read_only=True)
+    number_of_likes = serializers.SerializerMethodField(read_only=True)
 
     def get_trips(self, instance):
         return len(instance.trips.all())
 
+    def get_number_of_likes(self, instance):
+        number_of_trips = AppreciatedTrip.objects.filter(trip__owner_id=instance.id)
+        number_of_items = AppreciatedItem.objects.filter(item__trip__owner_id=instance.id)
+
+        return number_of_trips.count() + number_of_items.count()
+
     class Meta:
         model = Account
         fields = ['id', 'first_name', 'last_name', 'email',
-                  'date_joined', 'about', 'date_of_birth', 'trips', 'image']
+                  'date_joined', 'about', 'date_of_birth', 'trips', 'image', 'number_of_likes']
 
 
 class AccountUploadImageSerializer(serializers.ModelSerializer):

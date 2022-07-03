@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+
+import cloudinary
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -47,7 +49,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'drf_yasg',
     'corsheaders',
-    'cloudinary_storage',
+    'cloudinary',
 
     # apps
     'apps.account',
@@ -201,10 +203,11 @@ SWAGGER_SETTINGS = {
     }
 }
 
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': 'tripill',
-    'API_KEY': '971114791582729',
-    'API_SECRET': 'YnOq6CzsQ_UqpBT94J9HI4HATkA'
-}
-
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+cloudinary.config(
+    cloud_name="tripill",
+    api_key="971114791582729",
+    api_secret="YnOq6CzsQ_UqpBT94J9HI4HATkA",
+    secure=True
+)
