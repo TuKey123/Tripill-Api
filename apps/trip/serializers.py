@@ -26,7 +26,7 @@ class TripSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ['id', 'name', 'location', 'image', 'collaborators', 'album', 'days', 'is_liked', 'number_of_likes']
+        fields = ['id', 'name', 'image', 'collaborators', 'album', 'days', 'is_liked', 'number_of_likes']
 
 
 class NestedAccountSerializer(serializers.ModelSerializer):
@@ -81,7 +81,7 @@ class TripDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ['id', 'name', 'location', 'description', 'image', 'owner',
+        fields = ['id', 'name', 'description', 'image', 'owner',
                   'start_date', 'end_date', 'collaborators', 'items']
 
 
@@ -144,7 +144,7 @@ class CreateTripSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ['id', 'name', 'location', 'image', 'start_date', 'end_date']
+        fields = ['id', 'name', 'image', 'start_date', 'end_date']
 
 
 class UpdateTripSerializer(serializers.ModelSerializer):
