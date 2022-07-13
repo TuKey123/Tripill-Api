@@ -15,4 +15,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD gunicorn post_service.wsgi:application --bind 0.0.0.0:$PORT
+CMD gunicorn tripill_api.wsgi:application --bind 0.0.0.0:$PORT

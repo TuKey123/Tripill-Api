@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: 'gunicorn post_service.wsgi:application'
+    command: 'gunicorn tripill_api.wsgi:application'
     ports:
       - 8000:8000
     volumes:
@@ -14,4 +14,3 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: 'python consumer.py'

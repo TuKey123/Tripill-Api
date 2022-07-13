@@ -35,3 +35,4 @@ tzdata==2022.1
 uritemplate==4.1.1
 urllib3==1.26.9
 whitenoise==6.2.0
+gunicorn==20.1
