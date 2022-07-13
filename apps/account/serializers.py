@@ -222,7 +222,7 @@ class AccountUploadImageSerializer(serializers.ModelSerializer):
 class UpdateUserProfile(serializers.ModelSerializer):
     first_name = serializers.CharField(source='account.first_name')
     last_name = serializers.CharField(source='account.last_name')
-    image = serializers.CharField(max_length=256, required=True)
+    image = serializers.CharField(max_length=256, required=False, allow_blank=True)
 
     def update(self, instance, validated_data):
         with transaction.atomic():

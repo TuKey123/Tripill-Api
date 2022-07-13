@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+import django_heroku
 
 import cloudinary
 from dotenv import load_dotenv
@@ -211,3 +212,5 @@ cloudinary.config(
     api_secret="YnOq6CzsQ_UqpBT94J9HI4HATkA",
     secure=True
 )
+
+django_heroku.settings(locals())

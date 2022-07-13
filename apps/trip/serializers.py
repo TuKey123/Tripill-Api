@@ -137,6 +137,24 @@ class UpdateAlbumSerializer(serializers.ModelSerializer):
 
 
 class CreateTripSerializer(serializers.ModelSerializer):
+    days = serializers.SerializerMethodField(read_only=True)
+    is_liked = serializers.SerializerMethodField(read_only=True)
+    number_of_likes = serializers.SerializerMethodField(read_only=True)
+
+    def get_is_liked(self, instance):
+        user = self.context['request'].user
+
+        appreciated_trip = user.appreciated_trips.all().filter(trip=instance).first()
+
+        return True if appreciated_trip else False
+
+    def get_number_of_likes(self, instance):
+        return instance.appreciated_users.all().count()
+
+    def get_days(self, instance):
+        days = instance.end_date - instance.start_date
+        return days.days
+
     def create(self, validated_data):
         user = self.context['request'].user
 
@@ -144,7 +162,7 @@ class CreateTripSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ['id', 'name', 'image', 'start_date', 'end_date']
+        fields = ['id', 'name', 'image', 'start_date', 'end_date', 'days', 'is_liked', 'number_of_likes']
 
 
 class UpdateTripSerializer(serializers.ModelSerializer):
