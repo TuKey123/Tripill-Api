@@ -34,7 +34,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = ['https://tripill-api.herokuapp.com']
+CSRF_TRUSTED_ORIGINS = ['https://tripill-api.herokuapp.com', 'https://tripill-api.herokuapp.com/documents/']
 
 # Application definition
 
@@ -47,10 +47,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # dependencies
+    'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_yasg',
-    'corsheaders',
     'cloudinary',
 
     # apps
