@@ -34,6 +34,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
+CSRF_TRUSTED_ORIGINS = ['https://tripill-api.herokuapp.com']
 
 # Application definition
 
@@ -208,8 +209,8 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 cloudinary.config(
     cloud_name="tripill",
-    api_key="971114791582729",
-    api_secret="YnOq6CzsQ_UqpBT94J9HI4HATkA",
+    api_key=os.getenv('CLOUD_API_KEY'),
+    api_secret=os.getenv('CLOUD_API_SECRET'),
     secure=True
 )
 
